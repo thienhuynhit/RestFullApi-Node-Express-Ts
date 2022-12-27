@@ -1,0 +1,103 @@
+import { bookModel, IBook } from '../models/bookModel';
+// import express from 'express';
+import { RequestHandler } from 'express';
+
+// getAllBooks
+export const getAllBooks: RequestHandler = async (req, res, next) => {
+  try {
+    // thuc hien cac chuc nang query data -> sort -> limit fields -> paginate
+    //1. filtering to get query object
+    const queryObj = { ...req.query };
+    console.log(`This is query obj`, queryObj);
+    // loai bo [sort,fields,page,limit] ra khoi cai object de con lai cac dieu kien query
+    const excludedString = ['sort', 'fields', 'page', 'limit'];
+    excludedString.forEach((el) => {
+      delete queryObj[el];
+    });
+    // kiem tra qureyObj
+    // console.log(queryObj);
+    // sau khi loai bo cac query ko co ta se gan them $ vao truoc cac dk nhu la gte || gt || lt ||lte ||ne
+    // de thuc hien thi ta dung regex tim va replace chung
+    // chuyen queryObj sang string bang JSON.stringify()
+    let queryString = JSON.stringify(queryObj);
+    queryString = queryString.replace(/\b(gte|gt|lte|lt|ne)\b/g, (match) => `$${match}`);
+    console.log(queryString);
+    // sau do parse sang object query va query
+    // const dataBooks: IBook[] = await bookModel.find(JSON.parse(queryString));
+    let query = bookModel.find(JSON.parse(queryString));
+    // 2. SORT
+    if (req.query.sort) {
+      let sortBy = req.query.sort;
+      sortBy = (sortBy as string).split(',');
+      sortBy = sortBy.join(' ');
+      // console.log('day la chuoi sort', sortBy);
+      query = query.sort(sortBy);
+    } else {
+      query = query.sort('-createAt');
+    }
+    // 3. LIMIT FIELDS
+    if (req.query.fields) {
+      let fields = req.query.fields;
+      fields = (fields as string).split(',');
+      fields = fields.join(' ');
+      query = query.select(fields);
+    } else {
+      query = query.select('-__v');
+    }
+    // 4. PAGINATE
+    const page = +(req.query.page as string) || 1;
+    const limit = +(req.query.limit as string) || 100;
+    const skip = (page - 1) * limit;
+    query = query.skip(skip).limit(limit);
+    // EXECUTE
+    const dataBooks = await query;
+    res.status(200).json({ status: 'Successful', message: { length: dataBooks.length, data: dataBooks } });
+  } catch (error) {
+    res.status(404).json({ status: 'fail', message: 'not found', error: error });
+  }
+};
+
+// getBookById
+export const getBookById: RequestHandler = async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const data = await bookModel.findById(id);
+    res.status(200).json({ status: 'successful', data: data });
+  } catch (error) {
+    res.status(404).json({ status: 'fail', message: 'not found', error: error });
+  }
+};
+
+// createBook
+export const createBook: RequestHandler = async (req, res, next) => {
+  try {
+    const newBook = req.body;
+    const data = await bookModel.create(newBook);
+    res.status(201).json({ status: 'successful', data: data });
+  } catch (error) {
+    res.status(500).json({ status: 'fail', message: 'something went wrong', error: error });
+  }
+};
+
+// updateBookById
+export const updateBookById: RequestHandler = async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const newBook = req.body;
+    const data = await bookModel.findByIdAndUpdate(id, newBook, { runValidators: true });
+    res.status(200).json({ status: 'successful', data: data });
+  } catch (error) {
+    res.status(404).json({ status: 'fail', message: 'not found', error: error });
+  }
+};
+
+// deleteBookById
+export const deleteBookById: RequestHandler = async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const data = await bookModel.findByIdAndDelete(id);
+    res.status(200).json({ status: 'successful', data: data });
+  } catch (error) {
+    res.status(404).json({ status: 'fail', message: 'not found', error: error });
+  }
+};
